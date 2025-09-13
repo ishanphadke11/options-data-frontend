@@ -23,7 +23,7 @@ function App() {
       }).toString();
 
       const response = await fetch(
-        `http://127.0.0.1:5000/options/${formData.symbol}?${query}`
+        `https://options-data-backend.onrender.com/options/${formData.symbol}?${query}`
       );
       if (!response.ok) throw new Error("Failed to fetch data");
 
