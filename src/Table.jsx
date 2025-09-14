@@ -25,17 +25,15 @@ const Table = ({ data, minCommission, upperBound, maxSpread }) => {
 
     // Process each expiration group
     for (const exp in grouped) {
-      const options = grouped[exp].sort(
-        (a, b) => a.strike_price - b.strike_price
-      );
+      const options = grouped[exp]
+        .filter(opt => opt.premium != null) // only use options with valid premium
+        .sort((a, b) => a.strike_price - b.strike_price);
 
-      // Precompute expiry date + days diff once
       const expiryDate = new Date(exp);
       const diffDays = (expiryDate - now) / (1000 * 60 * 60 * 24);
 
-      if (diffDays <= 0) continue; // expired, skip
+      if (diffDays <= 0) continue; // skip expired
 
-      // Sliding window approach to avoid O(n²)
       for (let i = 0; i < options.length; i++) {
         for (
           let j = i + 1;
@@ -48,17 +46,13 @@ const Table = ({ data, minCommission, upperBound, maxSpread }) => {
 
           const strikeDiff = upper.strike_price - lower.strike_price;
           const premiumDiff = Math.abs(upper.premium - lower.premium);
-          console.log(upper.premium);
-          console.log(lower.premium);
-          console.log(premiumDiff);
 
           if (strikeDiff <= upperBound && premiumDiff >= minCommission) {
-            const yearlyInterest =
-              ((premiumDiff / strikeDiff) / diffDays) * 365 * 100;
+            const yearlyInterest = ((premiumDiff / strikeDiff) / diffDays) * 365 * 100;
             const monthlyInterest = yearlyInterest / 12;
 
             pairs.push({
-              expiration_date: expiryDate, // raw date
+              expiration_date: expiryDate,
               upper_strike: upper.strike_price,
               lower_strike: lower.strike_price,
               total_commission: premiumDiff,
@@ -69,6 +63,7 @@ const Table = ({ data, minCommission, upperBound, maxSpread }) => {
         }
       }
     }
+
     return pairs;
   }, [data, minCommission, upperBound, maxSpread]);
 
@@ -84,14 +79,8 @@ const Table = ({ data, minCommission, upperBound, maxSpread }) => {
             year: "numeric",
           }),
       },
-      {
-        header: "Upper Bound Strike",
-        accessorKey: "upper_strike",
-      },
-      {
-        header: "Lower Bound Strike",
-        accessorKey: "lower_strike",
-      },
+      { header: "Upper Bound Strike", accessorKey: "upper_strike" },
+      { header: "Lower Bound Strike", accessorKey: "lower_strike" },
       {
         header: "Total Commission",
         accessorKey: "total_commission",
