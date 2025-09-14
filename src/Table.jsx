@@ -48,6 +48,7 @@ const Table = ({ data, minCommission, upperBound, maxSpread }) => {
 
           const strikeDiff = upper.strike_price - lower.strike_price;
           const premiumDiff = Math.abs(upper.premium - lower.premium);
+          console.log(premiumDiff);
 
           if (strikeDiff <= upperBound && premiumDiff >= minCommission) {
             const yearlyInterest =
