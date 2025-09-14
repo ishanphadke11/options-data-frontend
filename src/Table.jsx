@@ -9,66 +9,58 @@ import {
 const Table = ({ data, minCommission, upperBound, maxSpread }) => {
   const [sorting, setSorting] = React.useState([]);
 
-  // Transform raw options into pairs
   const pairedData = React.useMemo(() => {
     if (!data || data.length === 0) return [];
 
     const pairs = [];
     const now = new Date();
+    const maxDiff = Math.min(upperBound, maxSpread);
 
     // Group by expiration date
     const grouped = data.reduce((acc, option) => {
-      const exp = option.expiration_date;
-      if (!acc[exp]) acc[exp] = [];
-      acc[exp].push(option);
+      if (!acc[option.expiration_date]) acc[option.expiration_date] = [];
+      acc[option.expiration_date].push(option);
       return acc;
     }, {});
 
-    // Build pairs within each expiration group
+    // Process each expiration group
     for (const exp in grouped) {
       const options = grouped[exp].sort(
         (a, b) => a.strike_price - b.strike_price
       );
 
+      // Precompute expiry date + days diff once
+      const expiryDate = new Date(exp);
+      const diffDays = (expiryDate - now) / (1000 * 60 * 60 * 24);
+
+      if (diffDays <= 0) continue; // expired, skip
+
+      // Sliding window approach to avoid O(n²)
       for (let i = 0; i < options.length; i++) {
-        for (let j = i + 1; j < options.length; j++) {
+        for (
+          let j = i + 1;
+          j < options.length &&
+          options[j].strike_price - options[i].strike_price <= maxDiff;
+          j++
+        ) {
           const lower = options[i];
           const upper = options[j];
 
           const strikeDiff = upper.strike_price - lower.strike_price;
           const premiumDiff = Math.abs(upper.premium - lower.premium);
 
-          // Now also check against maxSpread
-          if (
-            strikeDiff <= upperBound &&
-            premiumDiff >= minCommission &&
-            strikeDiff <= maxSpread
-          ) {
-            // Calculate expiry difference in days
-            const expiryDate = new Date(exp);
-            const diffTime = expiryDate - now;
-            const diffDays = diffTime / (1000 * 60 * 60 * 24);
-
-            let monthlyInterest = 0;
-            let yearlyInterest = 0;
-
-            if (diffDays > 0) {
-              yearlyInterest =
-                ((premiumDiff / strikeDiff) / diffDays) * 365 * 100;
-              monthlyInterest = yearlyInterest / 12;
-            }
+          if (strikeDiff <= upperBound && premiumDiff >= minCommission) {
+            const yearlyInterest =
+              ((premiumDiff / strikeDiff) / diffDays) * 365 * 100;
+            const monthlyInterest = yearlyInterest / 12;
 
             pairs.push({
-              expiration_date: expiryDate.toLocaleDateString("en-US", {
-                day: "numeric",
-                month: "short",
-                year: "numeric",
-              }),
+              expiration_date: expiryDate, // raw date
               upper_strike: upper.strike_price,
               lower_strike: lower.strike_price,
-              total_commission: premiumDiff.toFixed(2),
-              monthly_interest: monthlyInterest.toFixed(2),
-              yearly_interest: yearlyInterest.toFixed(2),
+              total_commission: premiumDiff,
+              monthly_interest: monthlyInterest,
+              yearly_interest: yearlyInterest,
             });
           }
         }
@@ -79,12 +71,39 @@ const Table = ({ data, minCommission, upperBound, maxSpread }) => {
 
   const columns = React.useMemo(
     () => [
-      { header: "Expiration Date", accessorKey: "expiration_date" },
-      { header: "Upper Bound Strike", accessorKey: "upper_strike" },
-      { header: "Lower Bound Strike", accessorKey: "lower_strike" },
-      { header: "Total Commission", accessorKey: "total_commission" },
-      { header: "Monthly Interest (%)", accessorKey: "monthly_interest" },
-      { header: "Yearly Interest (%)", accessorKey: "yearly_interest" },
+      {
+        header: "Expiration Date",
+        accessorKey: "expiration_date",
+        cell: (info) =>
+          info.getValue().toLocaleDateString("en-US", {
+            day: "numeric",
+            month: "short",
+            year: "numeric",
+          }),
+      },
+      {
+        header: "Upper Bound Strike",
+        accessorKey: "upper_strike",
+      },
+      {
+        header: "Lower Bound Strike",
+        accessorKey: "lower_strike",
+      },
+      {
+        header: "Total Commission",
+        accessorKey: "total_commission",
+        cell: (info) => info.getValue().toFixed(2),
+      },
+      {
+        header: "Monthly Interest (%)",
+        accessorKey: "monthly_interest",
+        cell: (info) => info.getValue().toFixed(2),
+      },
+      {
+        header: "Yearly Interest (%)",
+        accessorKey: "yearly_interest",
+        cell: (info) => info.getValue().toFixed(2),
+      },
     ],
     []
   );
