@@ -29,7 +29,8 @@ const Table = ({ data, minCommission, upperBound, maxSpread }) => {
         .filter(opt => opt.premium != null) // only use options with valid premium
         .sort((a, b) => a.strike_price - b.strike_price);
 
-      const expiryDate = new Date(exp);
+        
+      const expiryDate = new Date(exp + "T00:00:00Z"); // treat as UTC midnight
       const diffDays = (expiryDate - now) / (1000 * 60 * 60 * 24);
 
       if (diffDays <= 0) continue; // skip expired
